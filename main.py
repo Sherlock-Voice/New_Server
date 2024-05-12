@@ -14,11 +14,25 @@ from multiprocessing import Process
 from typing import Optional
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
+from fastapi.middleware.cors import CORSMiddleware
 
 # Google STT API Key
 os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/user1/sherlockvoice_server/app/sherlock-voice-c074041bd62d.json"
 
 app = FastAPI()
+
+# CORS 설정
+origins = [
+    "*",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials = True,  # cookie 설정
+    allow_methods=["*"],     
+    allow_headers=["*"],     
+)
 
 dataset = pd.read_csv('/Users/user1/sherlockvoice_server/app/dataset.csv')
 
