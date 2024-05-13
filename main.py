@@ -5,6 +5,7 @@ import pandas as pd
 import numpy as np
 import librosa
 import torch
+import uuid
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from google.cloud import speech
@@ -100,7 +101,16 @@ def transcribe_audio(content, sample_rate_hertz, sample_channels, filename):
 
     return summarize_keywords(transcriptions)
 
+# 유효성 검사 오류 처리기
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request, exc):
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors()}
+    )
+
 # 엔드포인트
+
 @app.post("/upload/")
 async def create_upload_file(file: UploadFile = File(...)):
     content = await file.read()
@@ -113,6 +123,8 @@ async def create_upload_file(file: UploadFile = File(...)):
     closest_match_prob = 1 - (np.linalg.norm(dataset.iloc[closest_match_idx, :-1] - features) / total_distance)
     closest_match_prob_percentage = "{:.3f}".format(closest_match_prob * 100)
 
+    # Generate a unique task_id using UUID
+    task_id = str(uuid.uuid4())
     result[file.filename] = {}
     
     # Initialize the dictionary for the current file
@@ -120,7 +132,7 @@ async def create_upload_file(file: UploadFile = File(...)):
         print(f"This audio file is fake with {closest_match_prob_percentage} percent probability.")
     else:
         print(f"This audio file is real with {closest_match_prob_percentage} percent probability.")
-        result[file.filename] = {
+        result[task_id] = {
             "closest_match_prob_percentage": closest_match_prob_percentage,
             "keywords": transcribe_audio(content, sample_rate, get_sample_channels(io.BytesIO(content)), file.filename)
         }
@@ -129,7 +141,7 @@ async def create_upload_file(file: UploadFile = File(...)):
         p = Process(target=transcribe_audio, args=(content, sample_rate, get_sample_channels(io.BytesIO(content)), file.filename))
         p.start()
         
-    return {"task_id": file.filename}
+    return {"task_id": task_id}
         
 @app.get("/waiting/{task_id}")
 async def waiting(task_id: str):
@@ -146,12 +158,6 @@ async def get_result(task_id: str):
     else:
         return {"error": "No result available or closest_match_prob_percentage not calculated yet"}
 
-# 유효성 검사 오류 처리기
-@app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc):
-    return JSONResponse(
-        status_code=422,
-        content={"detail": exc.errors()}
-    )
+
 
 # uvicorn app.main:app --reload  
