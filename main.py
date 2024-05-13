@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import librosa
 import torch
-import uuid
+import hashlib
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from google.cloud import speech
@@ -123,9 +123,9 @@ async def create_upload_file(file: UploadFile = File(...)):
     closest_match_prob = 1 - (np.linalg.norm(dataset.iloc[closest_match_idx, :-1] - features) / total_distance)
     closest_match_prob_percentage = "{:.3f}".format(closest_match_prob * 100)
 
-    # Generate a unique task_id using UUID
-    task_id = str(uuid.uuid4())
-    result[file.filename] = {}
+    # Hash the file name and convert it to an integer within a certain range
+    task_id = int(hashlib.sha256(file.filename.encode()).hexdigest(), 16) % 1000000  # Adjust the range as needed
+    result[task_id] = {}
     
     # Initialize the dictionary for the current file
     if closest_match_label == 'deepfake':
@@ -144,7 +144,7 @@ async def create_upload_file(file: UploadFile = File(...)):
     return {"task_id": task_id}
         
 @app.get("/waiting/{task_id}")
-async def waiting(task_id: str):
+async def waiting(task_id: int):
     # Check if the task is completed
     if task_id in result:
         return {"status": "ready"}
@@ -152,7 +152,7 @@ async def waiting(task_id: str):
         return {"status": "processing"}
 
 @app.get("/result/{task_id}")
-async def get_result(task_id: str):
+async def get_result(task_id: int):
     if task_id in result:
         return {"closest_match_prob_percentage": result[task_id]["closest_match_prob_percentage"], "keywords": result[task_id]["keywords"]}
     else:
