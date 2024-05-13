@@ -30,7 +30,7 @@ origins = [
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
-    allow_credentials = True,  # cookie 설정
+    allow_credentials = False,  # cookie 설정
     allow_methods=["*"],     
     allow_headers=["*"],     
 )
@@ -103,7 +103,7 @@ def transcribe_audio(content, sample_rate_hertz, sample_channels, filename):
 
 # 유효성 검사 오류 처리기
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request, exc):
+async def validation_exception_handler(exc):
     return JSONResponse(
         status_code=422,
         content={"detail": exc.errors()}
@@ -130,6 +130,7 @@ async def create_upload_file(file: UploadFile = File(...)):
     # Initialize the dictionary for the current file
     if closest_match_label == 'deepfake':
         print(f"This audio file is fake with {closest_match_prob_percentage} percent probability.")
+        result[task_id] = {"closest_match_prob_percentage": closest_match_prob_percentage}
     else:
         print(f"This audio file is real with {closest_match_prob_percentage} percent probability.")
         result[task_id] = {
@@ -154,10 +155,12 @@ async def waiting(task_id: int):
 @app.get("/result/{task_id}")
 async def get_result(task_id: int):
     if task_id in result:
-        return {"closest_match_prob_percentage": result[task_id]["closest_match_prob_percentage"], "keywords": result[task_id]["keywords"]}
+        if len(result[task_id]) == 1:
+            return {"closest_match_prob_percentage": result[task_id]["closest_match_prob_percentage"]}
+        else:
+            return {"closest_match_prob_percentage": result[task_id]["closest_match_prob_percentage"], "keywords": result[task_id]["keywords"]}
     else:
         return {"error": "No result available or closest_match_prob_percentage not calculated yet"}
-
 
 
 # uvicorn app.main:app --reload  
