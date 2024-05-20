@@ -9,16 +9,18 @@ import hashlib
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from google.cloud import speech
-from app.textrank_model import *
+from textrank_model import *
+from deepfake_model import *
 from multiprocessing import Process
 # from KoBERT_Model.KoBERT_model import *
 from typing import Optional
 from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
+import tempfile
 
 # Google STT API Key
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/user1/sherlockvoice_server/app/sherlock-voice-c074041bd62d.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/user1/SherlockVoice/sherlockvoice_server/app/sherlock-voice-da3e0129f362.json"
 
 app = FastAPI()
 
@@ -35,23 +37,7 @@ app.add_middleware(
     allow_headers=["*"],     
 )
 
-dataset = pd.read_csv('/Users/user1/sherlockvoice_server/app/dataset.csv')
-
-num_mfcc = 100
-num_mels = 128
-num_chroma = 50
-
 result = {} 
-
-# 합성 음성 판별
-def extract_features(X, sample_rate):
-    mfccs = np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_mfcc=num_mfcc).T, axis=0)
-    mel_spectrogram = np.mean(librosa.feature.melspectrogram(y=X, sr=sample_rate, n_mels=num_mels).T, axis=0)
-    chroma_features = np.mean(librosa.feature.chroma_stft(y=X, sr=sample_rate, n_chroma=num_chroma).T, axis=0)
-    zcr = np.mean(librosa.feature.zero_crossing_rate(y=X).T, axis=0)
-    spectral_centroid = np.mean(librosa.feature.spectral_centroid(y=X, sr=sample_rate).T, axis=0)
-    flatness = np.mean(librosa.feature.spectral_flatness(y=X).T, axis=0)
-    return np.concatenate((mfccs, mel_spectrogram, chroma_features, zcr, spectral_centroid, flatness))
 
 def get_sample_rate(file):
     with wave.open(file, "rb") as wave_file:
@@ -114,35 +100,35 @@ async def validation_exception_handler(exc):
 @app.post("/upload/")
 async def create_upload_file(file: UploadFile = File(...)):
     content = await file.read()
-    X, sample_rate = librosa.load(io.BytesIO(content))
-    features = extract_features(X, sample_rate)
-    
-    closest_match_idx = np.argmin(np.linalg.norm(dataset.iloc[:, :-1] - features, axis=1))
-    closest_match_label = dataset.iloc[closest_match_idx, -1]
-    total_distance = np.sum(np.linalg.norm(dataset.iloc[:, :-1] - features, axis=1))
-    closest_match_prob = 1 - (np.linalg.norm(dataset.iloc[closest_match_idx, :-1] - features) / total_distance)
-    closest_match_prob_percentage = "{:.3f}".format(closest_match_prob * 100)
 
+    # Create a temporary file and write the content to it
+    temp_file = tempfile.NamedTemporaryFile(delete=False)
+    temp_file.write(content)
+    temp_file.close()
+    
+    file_name = temp_file.name  # Use the temporary file's name as the file name
+    
     # Hash the file name and convert it to an integer within a certain range
     task_id = int(hashlib.sha256(file.filename.encode()).hexdigest(), 16) % 1000000  # Adjust the range as needed
-    result[task_id] = {}
+    result = {}
     
-    # Initialize the dictionary for the current file
-    if closest_match_label == 'deepfake':
-        print(f"This audio file is fake with {closest_match_prob_percentage} percent probability.")
-        result[task_id] = {"closest_match_prob_percentage": closest_match_prob_percentage}
+    deepfake_result = run_audio_classifier(file_name)
+    
+    if 'fake' in deepfake_result[file_name]['result']:
+        print(f"This audio file is fake with {deepfake_result[file_name]['prob']} percent probability.")
+        result[task_id] = {"closest_match_prob_percentage": deepfake_result[file_name]['prob']}
     else:
-        print(f"This audio file is real with {closest_match_prob_percentage} percent probability.")
+        print(f"This audio file is real with {deepfake_result[file_name]['prob']} percent probability.")
         result[task_id] = {
-            "closest_match_prob_percentage": closest_match_prob_percentage,
-            "keywords": transcribe_audio(content, sample_rate, get_sample_channels(io.BytesIO(content)), file.filename)
+            "closest_match_prob_percentage": deepfake_result[file_name]['prob'],
+            "keywords": transcribe_audio(content, get_sample_rate(io.BytesIO(content)), get_sample_channels(io.BytesIO(content)), file.filename)
         }
-        
         # Start transcribing audio in a separate process
-        p = Process(target=transcribe_audio, args=(content, sample_rate, get_sample_channels(io.BytesIO(content)), file.filename))
+        p = Process(target=transcribe_audio, args=(content, get_sample_rate(io.BytesIO(content)), get_sample_channels(io.BytesIO(content)), file.filename))
         p.start()
         
     return {"task_id": task_id}
+
         
 @app.get("/waiting/{task_id}")
 async def waiting(task_id: int):
