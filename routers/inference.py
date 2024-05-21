@@ -12,12 +12,9 @@ from models.deepfake_model import *
 from models.textrank_model import *
 
 # Google STT API Key
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/user1/SherlockVoice/sherlockvoice_server/app/routers/sv-server_key.json"
-
+# os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/user1/SherlockVoice/sherlockvoice_server/app/routers/sv-server_key.json"
 
 router = APIRouter()
-
-result = {}  # 결과를 저장할 딕셔너리
 
 result = {}  # 결과를 저장할 딕셔너리
 
@@ -32,7 +29,7 @@ def get_sample_channels(content):
         return wave_file.getnchannels()
 
 # 오디오 변환 및 텍스트 추출
-def transcribe_audio(content, sample_rate_hertz, sample_channels, filename):
+async def transcribe_audio(content, sample_rate_hertz, sample_channels, filename):
     client = speech.SpeechClient()
     audio = speech.RecognitionAudio(content=content)
     
@@ -63,7 +60,6 @@ def transcribe_audio(content, sample_rate_hertz, sample_channels, filename):
 
     return summarize_keywords(transcriptions)
 
-# 파일 업로드 엔드포인트
 @router.post("/upload/")
 async def create_upload_file(file: UploadFile = File(...)):
     content = await file.read()
@@ -87,11 +83,8 @@ async def create_upload_file(file: UploadFile = File(...)):
         print(f"This audio file is real with {deepfake_result[file_name]['prob']} percent probability.")
         result[task_id] = {
             "closest_match_prob_percentage": deepfake_result[file_name]['prob'],
-            "keywords": transcribe_audio(content, get_sample_rate(content), get_sample_channels(content), file.filename)
+            "keywords": await transcribe_audio(content, get_sample_rate(content), get_sample_channels(content), file.filename)
         }
-        # 별도의 프로세스로 오디오 변환 시작
-        p = Process(target=transcribe_audio, args=(content, get_sample_rate(content), get_sample_channels(content), file.filename))
-        p.start()
         
     return {"task_id": task_id}
 
