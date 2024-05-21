@@ -1,0 +1,7 @@
+sv-server_key.json
+venv/
+__pycache__/
+/venv
+/__pycache__
+.DS_Store/
+Dockerfile

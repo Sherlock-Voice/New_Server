@@ -1,3 +1,5 @@
+numpy==1.26.4
+scikit-learn==1.4.2
 annotated-types==0.6.0
 anyio==4.3.0
 audioread==3.0.1
@@ -40,7 +42,6 @@ mpmath==1.3.0
 msgpack==1.0.8
 networkx==3.2.1
 numba==0.59.1
-numpy==1.26.4
 orjson==3.10.3
 packaging==24.0
 pandas==2.2.2
@@ -62,7 +63,6 @@ PyYAML==6.0.1
 requests==2.31.0
 rich==13.7.1
 rsa==4.9
-scikit-learn==1.4.2
 scipy==1.13.0
 shellingham==1.5.4
 six==1.16.0
@@ -71,7 +71,6 @@ soundfile==0.12.1
 soxr==0.3.7
 starlette==0.37.2
 sympy==1.12
-textrank @ git+https://github.com/lovit/textrank.git@578c7fbbb22b24561b1bd4bab9a9ecc2dc9515e1
 threadpoolctl==3.5.0
 torch==2.3.0
 typer==0.12.3
@@ -83,3 +82,4 @@ uvicorn==0.29.0
 uvloop==0.19.0
 watchfiles==0.21.0
 websockets==12.0
+textrank @ git+https://github.com/lovit/textrank.git@578c7fbbb22b24561b1bd4bab9a9ecc2dc9515e1
