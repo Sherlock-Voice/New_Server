@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from routers import inference
+from app.routers import inference
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()

@@ -8,7 +8,7 @@ import os
 import time
 from scipy.spatial.distance import cosine
 
-data_file = "shuffle_400.csv"
+data_file = "/Users/user1/SherlockVoice/New_Server/app/models/shuffle_400.csv"
 
 
 def load_audio_features(file_name, num_mfcc=100, num_mels=128, num_chroma=50):

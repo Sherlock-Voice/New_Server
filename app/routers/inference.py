@@ -8,8 +8,8 @@ from google.cloud import speech
 from multiprocessing import Process
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from models.deepfake_model import *
-from models.textrank_model import *
+from app.models.deepfake_model import *
+from app.models.textrank_model import *
 
 # Google STT API Key
 # os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "/Users/user1/SherlockVoice/sherlockvoice_server/app/routers/sv-server_key.json"
@@ -78,10 +78,12 @@ async def create_upload_file(file: UploadFile = File(...)):
     
     if 'fake' in deepfake_result[file_name]['result']:
         print(f"This audio file is fake with {deepfake_result[file_name]['prob']} percent probability.")
-        result[task_id] = {"closest_match_prob_percentage": deepfake_result[file_name]['prob']}
+        result[task_id] = {"deepfake_check": True,
+            "closest_match_prob_percentage": deepfake_result[file_name]['prob']}
     else:
         print(f"This audio file is real with {deepfake_result[file_name]['prob']} percent probability.")
         result[task_id] = {
+            "deepfake_check": False,
             "closest_match_prob_percentage": deepfake_result[file_name]['prob'],
             "keywords": await transcribe_audio(content, get_sample_rate(content), get_sample_channels(content), file.filename)
         }
@@ -102,8 +104,8 @@ async def waiting(task_id: int):
 async def get_result(task_id: int):
     if task_id in result:
         if len(result[task_id]) == 1:
-            return {"closest_match_prob_percentage": result[task_id]["closest_match_prob_percentage"]}
+            return {"deepfake_check": result[task_id]["deepfake_check"],"closest_match_prob_percentage": result[task_id]["closest_match_prob_percentage"]}
         else:
-            return {"closest_match_prob_percentage": result[task_id]["closest_match_prob_percentage"], "keywords": result[task_id]["keywords"]}
+            return {"deepfake_check": result[task_id]["deepfake_check"], "closest_match_prob_percentage": result[task_id]["closest_match_prob_percentage"], "keywords": result[task_id]["keywords"]}
     else:
         return {"error": "No result available or closest_match_prob_percentage not calculated yet"}
